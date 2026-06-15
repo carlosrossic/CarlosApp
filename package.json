@@ -5,7 +5,7 @@
   "main": "./dist/main.js",
   "type": "commonjs",
   "scripts": {
-    "build": "tsc --noEmit && tsup",
+    "build": "npx prisma migrate deploy --schema=prisma/postgresql-schema.prisma && tsc --noEmit && tsup && npx prisma generate --schema=prisma/postgresql-schema.prisma",
     "start": "tsx ./src/main.ts",
     "start:prod": "node dist/main",
     "dev:server": "tsx watch ./src/main.ts",
