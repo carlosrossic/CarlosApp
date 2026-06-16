@@ -15,35 +15,35 @@ type MigrateStatusController = {
 class MigrateStatusControllerImpl implements MigrateStatusController {
   public async check(req: Request, res: Response, _next: NextFunction): Promise<Response> {
     const payload = req.body || {};
-    const urls = Array.isArray(payload.urls) ? payload.urls : [];
+    const urls = Array.isArray(payload.urls) ? (payload.urls as any[]).map((item) => String(item)) : [];
     const host = typeof payload.host === 'string' ? payload.host : 'http://localhost:3000';
 
     if (!urls.length) {
       return res.status(400).json({ error: 'urls is required' });
     }
 
-    const normalized = Array.from(new Set(urls.map((raw) => String(raw).trim()))).map((value) => {
-        if (/^https?:\/\//i.test(value)) {
-          return value;
-        }
-        const path = (value as string).replace(/^\/+/, '');
-        return path ? `/${path}` : '/';
-      });
+    const normalized = Array.from(new Set(urls.map((raw) => raw.trim()))).map((value: string) => {
+      if (/^https?:\/\//i.test(value)) {
+        return value;
+      }
+      const pathValue = value.replace(/^\/+/, '');
+      return pathValue ? `/${pathValue}` : '/';
+    });
 
     const results: MigrationRecord[] = await Promise.all(
-      normalized.map(async (url) => {
+      normalized.map(async (url: string) => {
         const started = Date.now();
         try {
-          const response = (await axios.get<unknown>(url, { timeout: 5000 })) as AxiosResponse<unknown>;
+          const response = await axios.get(url, { timeout: 5000 });
           return { url, status: response.status, elapsedMs: Date.now() - started };
         } catch (error) {
-          const axiosError = error as AxiosError;
-          const status = axiosError?.response?.status ?? 0;
+          const axiosError = error as any;
+          const status = (axiosError?.response?.status as number | undefined) ?? 0;
           return {
             url,
             status,
             elapsedMs: Date.now() - started,
-            error: axiosError?.message ?? 'Unknown error',
+            error: typeof axiosError?.message === 'string' ? axiosError.message : 'Unknown error',
           };
         }
       }),

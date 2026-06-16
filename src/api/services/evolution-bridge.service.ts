@@ -44,7 +44,9 @@ export class EvolutionBridgeService {
       const raw = await fs.readFile(filePath, 'utf8');
       return JSON.parse(raw || '[]') as T;
     } catch (error) {
-      const notFound = (error as Node.ErrnoException | undefined)?.code === 'ENOENT';
+      const err = error as any;
+      const code = typeof err?.code === 'string' ? err.code : null;
+      const notFound = code === 'ENOENT';
       if (notFound) {
         return [] as unknown as T;
       }
