@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { migrateStatusController } from '@controllers/migrate-status.controller';
+import { migrateStatusController } from './api/controllers/migrate-status.controller';
 
 const router = Router();
 
