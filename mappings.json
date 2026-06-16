@@ -1,0 +1,12 @@
+{
+	"chats": {
+		"1420125289": {
+			"type": "telegram",
+			"owner": true
+		}
+	},
+	"reverse": {
+		"1420125289": null
+	},
+	"lastUpdate": "2026-06-16T00:00:00.000Z"
+}

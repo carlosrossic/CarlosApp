@@ -24,6 +24,7 @@ import { MessageRouter } from './sendMessage.router';
 import { SettingsRouter } from './settings.router';
 import { TemplateRouter } from './template.router';
 import { ViewsRouter } from './view.router';
+import { EvolutionBridgeRouter } from '@routes/evolution-bridge.router';
 
 enum HttpStatus {
   OK = 200,
@@ -227,6 +228,7 @@ router
   .use('', new ChannelRouter(configService, ...guards).router)
   .use('', new EventRouter(configService, ...guards).router)
   .use('', new ChatbotRouter(...guards).router)
-  .use('', new StorageRouter(...guards).router);
+  .use('', new StorageRouter(...guards).router)
+  .use('', new EvolutionBridgeRouter().router);
 
 export { HttpStatus, router };
