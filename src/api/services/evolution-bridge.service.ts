@@ -1,100 +1,63 @@
-import { Injectable } from '@nestjs/common';
-import { WAMonitoringService } from '@api/services/monitor.service';
-import { PrismaRepository } from '@api/repository/repository.service';
-import { ConfigService } from '@nestjs/config';
-import { AxiosResponse } from 'axios';
-import axios from 'axios';
-import { pathToFileURL } from 'url';
+import fs from 'fs/promises';
+import path from 'path';
+import { Logger } from '../../config/logger.config';
 
-@Injectable()
+export type QueuedMessage = {
+  jid?: string;
+  text?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+const DEFAULT_DIR = path.resolve(process.cwd(), 'evolution-bridge');
+
 export class EvolutionBridgeService {
-  private readonly url: string;
-  private readonly token: string;
-  private readonly instance: string;
+  private readonly dataDir: string;
+  private readonly logger = new Logger('EvolutionBridgeService');
 
-  constructor(
-    private readonly waMonitor: WAMonitoringService,
-    private readonly prismaRepository: PrismaRepository,
-    private readonly configService: ConfigService,
-  ) {
-    this.url = String(this.configService.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
-    this.token = String(this.configService.get('EVOLUTION_API_TOKEN') || '');
-    this.instance = String(this.configService.get('EVOLUTION_INSTANCE_NAME') || 'Carlos');
+  constructor(dataDir?: string) {
+    this.dataDir = dataDir && dataDir.trim() ? path.resolve(dataDir) : DEFAULT_DIR;
   }
 
-  async enqueueWhatsApp(jid: string, text: string, suggested?: string) {
-    const targetJid = jid || suggested || '';
-    if (!/^\d+@s\.whatsapp\.net$/.test(targetJid)) return null;
-    return this.sendText(targetJid, text);
+  async listOutbox(): Promise<QueuedMessage[]> {
+    return this.readJson<QueuedMessage[]>('outbox-whatsapp.json');
   }
 
-  async sendText(to: string, text: string) {
-    const api = (this.waMonitor as any)?.waInstances?.[this.instance];
-    if (!api) throw new Error(`Instance ${this.instance} not ready`);
-
-    const response = await api.sendTextMessage({
-      number: to.replace(/@s\.whatsapp\.net$/, ''),
-      text,
-    });
-
-    return response || { status: 'sent' };
-  }
-
-  async listOutbox(): Promise<Array<{ id?: any; to?: any; text?: any; jid?: any; destination?: any }>> {
-    const outboxPath = this.resolveQueuePath('outbox.json');
-    try {
-      const content = await this.readJsonFile<any[]>(outboxPath);
-      return Array.isArray(content) ? content : [];
-    } catch (err) {
-      return [];
-    }
-  }
-
-  async writeOutbox(payload: Array<any>) {
-    const outboxPath = this.resolveQueuePath('outbox.json');
-    await this.writeJsonFile(outboxPath, payload);
-  }
-
-  async pushInbox(item: any) {
-    const inboxPath = this.resolveQueuePath('inbox.json');
-    const list = await this.readJsonFile<any[]>(inboxPath);
+  async pushInbox(item: QueuedMessage) {
+    const list = await this.readJson<QueuedMessage[]>('inbox.json');
     list.push(item);
-    await this.writeJsonFile(inboxPath, list);
+    await this.writeJson('inbox.json', list);
   }
 
   async readMappings() {
-    const file = this.resolveQueuePath('mappings.json');
+    return this.readJson<Record<string, unknown>>('mappings.json');
+  }
+
+  private resolvePath(relative: string) {
+    return path.join(this.dataDir, relative);
+  }
+
+  private async readJson<T>(relative: string): Promise<T> {
+    const filePath = this.resolvePath(relative);
     try {
-      const content = await this.readJsonFile(file);
-      return content || { chats: {}, reverse: {} };
-    } catch (err) {
-      return { chats: {}, reverse: {} };
+      const raw = await fs.readFile(filePath, 'utf8');
+      return JSON.parse(raw || '[]') as T;
+    } catch (error) {
+      const notFound = (error as Node.ErrnoException | undefined)?.code === 'ENOENT';
+      if (notFound) {
+        return [] as unknown as T;
+      }
+      throw error;
     }
   }
 
-  async writeMappings(payload: any) {
-    const file = this.resolveQueuePath('mappings.json');
-    await this.writeJsonFile(file, payload);
-  }
-
-  private resolveQueuePath(relative: string) {
-    const absolute = this.configService.get<string>('EVOLUTION_BRIDGE_QUEUE_DIR');
-    if (!absolute) {
-      return pathToFileURL(require('path').join(require('os').homedir(), '.evolution-bridge', relative)).href;
-    }
-    return pathToFileURL(require('path').join(absolute, relative)).href;
-  }
-
-  private async readJsonFile<T>(filePath: string): Promise<T> {
-    const fs = await import('fs');
-    if (!fs.existsSync(filePath)) return [] as unknown as T;
-    const raw = await fs.promises.readFile(filePath, 'utf8');
-    return JSON.parse(raw || '[]');
-  }
-
-  private async writeJsonFile(filePath: string, payload: any) {
-    const fs = await import('fs');
-    await fs.promises.mkdir(require('path').dirname(filePath), { recursive: true });
-    await fs.promises.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+  private async writeJson(relative: string, data: unknown) {
+    const filePath = this.resolvePath(relative);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    const tmp = `${filePath}.tmp-${Date.now()}`;
+    const content = JSON.stringify(data, null, 2);
+    await fs.writeFile(tmp, content, 'utf8');
+    await fs.rename(tmp, filePath);
   }
 }

@@ -23,12 +23,12 @@ class MigrateStatusControllerImpl implements MigrateStatusController {
     }
 
     const normalized = Array.from(new Set(urls.map((raw) => String(raw).trim()))).map((value) => {
-      if (/^https?:\/\//i.test(value)) {
-        return value;
-      }
-      const path = value.replace(/^\/+/, '');
-      return path ? `/${path}` : '/';
-    });
+        if (/^https?:\/\//i.test(value)) {
+          return value;
+        }
+        const path = (value as string).replace(/^\/+/, '');
+        return path ? `/${path}` : '/';
+      });
 
     const results: MigrationRecord[] = await Promise.all(
       normalized.map(async (url) => {

@@ -24,7 +24,7 @@ import { MessageRouter } from './sendMessage.router';
 import { SettingsRouter } from './settings.router';
 import { TemplateRouter } from './template.router';
 import { ViewsRouter } from './view.router';
-import { EvolutionBridgeRouter } from '@routes/evolution-bridge.router';
+import EvolutionBridgeRouter from './evolution-bridge.router';
 
 enum HttpStatus {
   OK = 200,
